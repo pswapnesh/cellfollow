@@ -14,6 +14,7 @@ from collections import defaultdict, deque
 
 import cv2
 import numpy as np
+import torch
 
 from cell_tracker import CellTracker
 from gmm import outline
@@ -100,13 +101,18 @@ def main():
     p.add_argument("--masks", default="none", choices=("none", "fg", "flow"), help="none: points only, the decoder does not run")
     p.add_argument("--invert", action="store_true")
     p.add_argument("--cpu", action="store_true")
+    p.add_argument("--keep-dense", action="store_true",
+                    help="keep the dense decoder loaded even with --masks none, so 'm' can switch it on later")
     p.add_argument("--level", type=float, default=0.5, help="outline at sum_i exp(-d_i^2 / 2) = level; lower: larger")
     args = p.parse_args()
     level = args.level
 
     device = "cpu" if args.cpu else None
     masks = None if args.masks == "none" else args.masks
-    tracker = CellTracker(args.weights, masks=masks, device=device, invert=args.invert, keep_dense=True)
+    tracker = CellTracker(args.weights, masks=masks, device=device, invert=args.invert, keep_dense=args.keep_dense)
+    print(f"device: {tracker.device} ({'GPU' if tracker.device.type == 'cuda' else 'CPU'})"
+          + (f" - {torch.cuda.get_device_name(tracker.device)}, half={tracker.half}" if tracker.device.type == "cuda" else ""))
+    print(f"dense decoder loaded: {tracker.net.decoder is not None}")
     cap = open_camera(args.cam)
     trails, fps = defaultdict(lambda: deque(maxlen=15)), 0.0
     while True:
@@ -128,8 +134,11 @@ def main():
         if key in (ord("q"), 27):
             break
         elif key == ord("m"):
-            tracker.set_masks(MODES[(MODES.index(tracker.masks) + 1) % len(MODES)])
-            trails.clear()
+            try:
+                tracker.set_masks(MODES[(MODES.index(tracker.masks) + 1) % len(MODES)])
+                trails.clear()
+            except ValueError as e:
+                print(e, "(pass --keep-dense to allow switching masks on)")
         elif key == ord("i"):
             tracker.invert = not tracker.invert
         elif key == ord("r"):

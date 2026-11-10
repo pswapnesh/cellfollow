@@ -57,6 +57,66 @@ python test_live.py --cam 0 --masks fg --cpu
 Uses a USB camera if one is present, otherwise the integrated one. Keys: `q` quit, `m` masks (off / fg / flow),
 `i` invert, `r` reset tracks, `s` save frame.
 
+## Enderscope
+
+```
+pip install -r requirements-enderscope.txt
+python enderscope_test.py --stage-port /dev/ttyUSB0       # small bounded moves, run this first
+python enderscope_live.py --stage-port /dev/ttyUSB0
+python enderscope_live.py --no-stage                      # vision only, no hardware
+```
+
+Drives an [Enderscope](https://github.com/mutterer/enderscopy) (a 3D-printer-chassis microscope) while tracking,
+on the scope's own camera via OpenCV. Only X (east/west) and Z (up/down) are ever driven - this rig's camera
+moves with those two, not with Y (the bed's front-to-back travel) - so Y is never jogged and never used by follow.
+
+### Keys (`enderscope_live.py`)
+
+| Key | Action |
+|---|---|
+| `q` / `Esc` | Quit |
+| `m` | Cycle masks (off / fg / flow) |
+| `i` | Toggle invert |
+| `r` | Reset tracks |
+| `s` | Save frame |
+| `[` / `]` | Outline level down / up (lower = larger outline) |
+| `a` / `d` | Jog stage west / east (X) |
+| `e` / `c` | Jog stage up / down (Z) |
+| `h` | Home stage |
+| `l` | Toggle illuminator light |
+| `←`/`→` (or `↑`/`↓`) | Select a tracked cell (white ring) |
+| `f` | Follow the selected cell (yellow cross) until it's lost, strays past `--follow-limit`, or `f` again |
+| `+` / `-` | Increase / decrease follow gain (speed of the follow correction) |
+
+Jogging and home are disabled while `f` is actively following - press `f` again to stop first.
+
+`f` has the stage follow the selected cell: its pixel offset from frame centre is converted to mm using its own
+apparent size in pixels against `--object-size` (set this to the real size of your sample, e.g. ~0.002mm for a
+2 micron bacterium, or the moves will be the wrong scale), scaled by `--follow-gain` (lower it if follow
+drifts/overshoots instead of settling - `+`/`-` adjust this live), capped at `--follow-max-step` mm per
+correction, and stopped if the track is lost or the stage strays past `--follow-limit` mm from where it started.
+The camera/tracking loop and the stage move independently on separate threads - the stage's serial round-trips
+are the slow part, and publishing a fresh target just replaces a stale one the mover hasn't gotten to yet, so
+the camera/display frame rate is never held hostage by how fast the hardware responds.
+
+`--cpu` forces the model onto CPU (no GPU/CUDA needed at all), in case this runs on a machine without a GPU.
+
+`third_party/enderscopy` is an
+unmodified copy of its `enderscope` package (pinned to commit `ea935a7`, with its original `LICENSE`), not
+`pip install`ed: its `pyproject.toml` has a placeholder author email that current `setuptools` rejects outright,
+so `pip install` (even `--no-deps`) fails before it gets anywhere near resolving dependencies like `picamera2`.
+A plain file copy sidesteps that entirely - `enderscope_live.py`/`enderscope_test.py` just add it to `sys.path`
+and `import enderscope` normally. Requires the user to be in the `dialout` group
+(`sudo usermod -aG dialout $USER`, then re-login) to open the serial port at all.
+
+To refresh the vendored copy from a newer commit, re-download `enderscope/enderscope.py`, `enderscope/__init__.py`
+and `LICENSE` from the repo at the desired ref into `third_party/enderscopy/`.
+
+`enderscope_test.py` is a small bounded motion smoke test for first contact with a stage: it nudges one axis at a
+time by `--step` mm and back, checking the reported position against `--limit` mm from the start after every move,
+and aborts on Ctrl+C between moves. Run it before `enderscope_live.py` on any stage/wiring you haven't moved
+through this code before.
+
 ## Video or TIFF stack
 
 ```
@@ -78,4 +138,7 @@ Saves an mp4 with outlines or masks and tracks drawn as in the live view. `--con
 | `masks.py` | Masks from the foreground map and flow |
 | `model.py` | The network |
 | `test_live.py` | Webcam view |
+| `enderscope_live.py` | Webcam view driven by an Enderscope stage/illuminator |
+| `enderscope_test.py` | Small bounded stage-motion smoke test |
+| `third_party/enderscopy/` | Vendored copy of the `enderscope` package (`Stage`, `EnderLights`, ...) |
 | `test_on_video.py` | Process a video or TIFF stack, save the result |
