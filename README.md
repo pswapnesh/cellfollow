@@ -139,9 +139,9 @@ Saves an mp4 with outlines or masks and tracks drawn as in the live view. `--con
 | `model.py` | The network |
 | `utils/kalman.py` | A reusable constant-velocity Kalman filter |
 | `utils/pid.py` | A reusable PID controller |
+| `camera.py` | `Camera`: a USB camera if present, else the Pi's CSI camera via picamera2 |
 | `test_live.py` | Webcam view |
 | `enderscope_live.py` | Webcam view driven by an Enderscope stage/illuminator |
 | `enderscope_test.py` | Small bounded stage-motion smoke test |
 | `third_party/enderscopy/` | Vendored copy of the `enderscope` package (`Stage`, `EnderLights`, ...) |
-| `third_party/ultralytics_cfg/` | Vendored copy of `yolo26.yaml` (AGPL-3.0, see its `LICENSE`) |
 | `test_on_video.py` | Process a video or TIFF stack, save the result |

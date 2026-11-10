@@ -16,6 +16,7 @@ import cv2
 import numpy as np
 import torch
 
+from camera import Camera
 from cell_tracker import CellTracker
 from tracking.gmm import outline
 
@@ -23,28 +24,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 MODES = (None, "fg", "flow")
 
 
-def camera_candidates():
-    """Capture devices, external cameras first, integrated last."""
-    root = "/sys/class/video4linux"
-    if not os.path.isdir(root):
-        return [(i, f"camera {i}") for i in range(4)]
-
-    def read(d, f):
-        path = os.path.join(root, d, f)
-        return open(path).read().strip() if os.path.exists(path) else ""
-    cams = [(int(d[5:]), read(d, "name")) for d in os.listdir(root)
-            if d[5:].isdigit() and read(d, "index") in ("", "0")]  # index > 0: metadata node
-    return sorted(sorted(cams), key=lambda c: "integrated" in c[1].lower())
-
-
 def open_camera(cam):
-    for i, name in ([(cam, f"camera {cam}")] if cam >= 0 else camera_candidates()):
-        cap = cv2.VideoCapture(i)
-        if cap.isOpened() and cap.read()[0]:
-            print(f"camera {i}: {name}")
-            return cap
-        cap.release()
-    raise SystemExit("no camera found")
+    """A USB camera if one is present, otherwise the Pi's CSI camera via picamera2 (see camera.py)."""
+    return Camera(cam)
 
 
 def center_crop(frame, size):

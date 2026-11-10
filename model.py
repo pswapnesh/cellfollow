@@ -8,7 +8,6 @@ Input (B, 2, H, W) [main, second channel, zeros if absent]. Outputs:
 """
 
 import math
-import os
 
 import torch
 import torch.nn as nn
@@ -16,12 +15,6 @@ import torch.nn.functional as F
 from ultralytics.nn.modules import Conv, DWConv
 from ultralytics.nn.tasks import DetectionModel
 from ultralytics.utils.torch_utils import fuse_conv_and_bn
-
-HERE = os.path.dirname(os.path.abspath(__file__))
-# A vendored copy (third_party/ultralytics_cfg, see its LICENSE), not whatever's bundled with the installed
-# ultralytics: older pins may lack YOLO26, and DetectionModel's own scale-suffix resolution finds this file even
-# though "yolo26n.yaml" itself doesn't literally exist (only yolo26.yaml, with the n/s/m/l/x scales inside it).
-YOLO26_YAML = os.path.join(HERE, "third_party", "ultralytics_cfg", "26", "yolo26n.yaml")
 
 TAPS = (0, 2, 16, 19, 22)  # layers of yolo26n.yaml: P1, P2 (backbone), P3, P4, P5 (neck)
 P3 = 2                     # index of P3 in TAPS
@@ -122,7 +115,7 @@ class CellNet(nn.Module):
     def __init__(self, nc=4, k=4):
         super().__init__()
         self.adapter = InputAdapter()
-        self.backbone = DetectionModel(YOLO26_YAML, ch=3, verbose=False).model[:-1]  # without the Detect head
+        self.backbone = DetectionModel("yolo26n.yaml", ch=3, verbose=False).model[:-1]  # without the Detect head
         with torch.no_grad():
             chs = [f.shape[1] for f in self.features(torch.zeros(1, 3, 64, 64))]
         self.decoder = DenseDecoder(chs)
