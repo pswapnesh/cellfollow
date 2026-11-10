@@ -5,16 +5,18 @@ its pyproject.toml fails to build on current setuptools, see README) and is impo
 
 Keys: q/Esc quit | m masks (off / fg / flow) | i invert | r reset tracks | s save frame
       [ / ] outline level down / up (lower level: larger outline)
-      a/d jog west/east | e/c jog up/down | h home | l toggle light
-      Left/Right (or Up/Down) select a tracked cell | f follow the selected cell until it's lost or f again
+      a/d jog west/east (x) | w/x jog south/north (y) | e/c jog up/down (z) - only the two axes in --axes jog
+      h home | l toggle light
+      Left/Right (or Up/Down) select a tracked cell | f toggle following it (switches to the nearest-to-centre
+      track if it's lost, rather than stopping; stops only on f again or if no tracks remain)
       +/- increase/decrease follow gain (speed of the follow correction)
 
     python enderscope_live.py --stage-port /dev/ttyUSB0
-    python enderscope_live.py --stage-port /dev/ttyUSB0 --light-port /dev/ttyUSB1 --home
+    python enderscope_live.py --stage-port /dev/ttyUSB0 --axes xy
     python enderscope_live.py --no-stage   # camera + tracker only, no hardware (e.g. to test the vision side first)
 
-Only X (east/west) and Z (up/down) are driven - this rig's camera moves with those two, not with Y (the bed's
-front-to-back travel), so Y is never jogged and never used by follow.
+Only two axes are ever driven, whichever --axes names (default xz): jog and follow both only touch those two,
+leaving the third alone entirely - set this to whichever pair your camera actually moves with.
 
 Follow (f): follows the cell selected with the arrow keys (white ring; the lowest id is selected by default).
 Every tracking frame, a dedicated single-point Kalman filter (position + velocity, separate from the main
@@ -24,11 +26,13 @@ frames, become the error for a PID controller (one per axis, --follow-gain/--fol
 capped at --follow-max-step mm) whose output is what actually moves the stage. The PID/Kalman step and the move
 itself run on an independent mover thread: the camera/tracking loop just publishes the latest filtered
 target into a one-slot mailbox, and a fresher one simply replaces a stale one the mover hasn't gotten to yet -
-the stage's G-code handshake is the slow part, and it must never stall the camera loop. Follow stops itself if
-the track is lost, or if the stage has moved more than --follow-limit mm from where following began (defense in
-depth beyond the per-move cap). Default axis mapping (image x -> stage east/west, image y -> stage up/down) is
-a guess: if the followed cell drifts further from centre instead of closer, stop (f) and retry with
---flip-x/--flip-y.
+the stage's G-code handshake is the slow part, and it must never stall the camera loop. f toggles following on
+and off; losing the followed cell switches to whichever other track is nearest the frame centre instead of
+stopping, so an ordinary track swap doesn't quietly turn follow off - it only stops on f again, or if no tracks
+remain at all, or if the stage has moved more than --follow-limit mm from where following began (defense in
+depth beyond the per-move cap). image x always drives --axes's first letter, image y its second; which physical
+direction is positive on each is a guess: if the followed cell drifts further from centre instead of closer,
+stop (f) and retry with --flip-x/--flip-y.
 """
 
 import argparse
@@ -50,8 +54,27 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "third_party", "enderscopy"))
 from enderscope import EnderLights, SerialDevice, Stage  # noqa: E402
 
-JOG_KEYS = {"a": "west", "d": "east", "e": "up", "c": "down"}
+AXIS_DIRS = {"x": ("west", "east"), "y": ("south", "north"), "z": ("down", "up")}  # (negative, positive)
+AXIS_INDEX = {"x": 0, "y": 1, "z": 2}  # position into stage.get_position()'s (X, Y, Z)
+AXIS_JOG_KEYS = {"x": ("a", "d"), "y": ("x", "w"), "z": ("c", "e")}  # (negative key, positive key)
+AXIS_STEP_ARG = {"x": "x_step", "y": "y_step", "z": "z_step"}
 PREV_KEYS, NEXT_KEYS = (81, 82), (83, 84)  # Left/Up, Right/Down (X11 keysym & 0xFF; may differ on other backends)
+
+
+def parse_axes(axes):
+    axes = axes.lower()
+    if len(axes) != 2 or set(axes) - set("xyz") or axes[0] == axes[1]:
+        raise SystemExit(f"--axes must be two distinct letters from x/y/z, got {axes!r}")
+    return axes
+
+
+def jog_keys_for(axes):
+    keys = {}
+    for axis in axes:
+        neg_key, pos_key = AXIS_JOG_KEYS[axis]
+        neg_dir, pos_dir = AXIS_DIRS[axis]
+        keys[neg_key], keys[pos_key] = neg_dir, pos_dir
+    return keys
 
 
 class Follow:
@@ -67,12 +90,14 @@ class Follow:
     there's no need to lock those."""
 
     def __init__(self, stage, size, object_size, gain, ki, kd, max_step, deadband, interval, limit, lookahead,
-                 flip_x, flip_y):
+                 flip_x, flip_y, axes="xz"):
         self.stage, self.size, self.object_size, self.max_step = stage, size, object_size, max_step
         self.deadband, self.interval, self.limit, self.lookahead = deadband, interval, limit, lookahead
         self.flip_x, self.flip_y = flip_x, flip_y
+        self.dirs = (AXIS_DIRS[axes[0]], AXIS_DIRS[axes[1]])  # image-x's axis, then image-y's axis
+        self.idx = (AXIS_INDEX[axes[0]], AXIS_INDEX[axes[1]])
         self.id = self.start = None
-        self.offset = np.zeros(2)  # commanded x, z displacement since start_on, mm; written by the mover thread
+        self.offset = np.zeros(2)  # commanded displacement since start_on, mm, one per axes letter; mover-owned
         self.frame_i = 0
         self.kalman = ConstantVelocityKalman(dim=2, q=4.0, r=16.0)  # tracks the cell's centre (px) for follow only
         self.pid_x = PID(gain, ki, kd, i_limit=max_step, out_limit=max_step)
@@ -114,16 +139,32 @@ class Follow:
         print(f"follow {reason} (track {self.id})")
         self.id = self.start = None
 
+    def _nearest_to_centre(self, tracks):
+        if not tracks:
+            return None
+        c = self.size / 2
+        return min(tracks, key=lambda t: (t.x - c) ** 2 + (t.y - c) ** 2)
+
     def update(self, result):
         """Call every tracking frame from the main thread: feeds the Kalman filter and publishes its latest
-        estimate for the mover thread, or finalises a stop the mover decided on its own (lost/strayed)."""
+        estimate for the mover thread, or finalises a stop the mover decided on its own (lost/strayed). If the
+        followed track disappears, switches to whichever other track is nearest the frame centre rather than
+        stopping - f toggles tracking on/off, it shouldn't also quietly turn itself off on an ordinary track
+        swap. Only the Kalman filter is reset on a switch (it's main-thread-only); the PID state and the stage
+        offset/limit accounting carry over, since those belong to the mover thread and to the whole follow
+        session, not to any one track."""
         if self._stop.is_set():
             self.cancel(self._abort_reason or "stopped")
             return
         track = next((t for t in result.tracks if t.id == self.id), None)
         if track is None:
-            self.cancel("lost")
-            return
+            track = self._nearest_to_centre(result.tracks)
+            if track is None:
+                self.cancel("lost (no other tracks to switch to)")
+                return
+            print(f"lost track {self.id}, now following nearest-to-centre track {track.id}")
+            self.id = track.id
+            self.kalman.reset([track.x, track.y])
         self.frame_i += 1
         x, y = self.kalman.step([track.x, track.y])
         if self.frame_i % self.interval:
@@ -135,10 +176,14 @@ class Follow:
 
     def position(self, pos):
         """Estimated stage position for the HUD (start + commanded offset so far, not re-queried from the
-        hardware; Y is never moved, so it stays at its start value); pos: fallback while not following."""
+        hardware; the axis not in axes is never moved, so it stays at its start value); pos: fallback while not
+        following."""
         if self.start is None:
             return pos
-        return (self.start[0] + self.offset[0], self.start[1], self.start[2] + self.offset[1])
+        p = list(self.start)
+        p[self.idx[0]] += self.offset[0]
+        p[self.idx[1]] += self.offset[1]
+        return tuple(p)
 
     def _mover(self):
         """Runs on its own thread: moves toward whatever the latest published target is, at whatever pace the
@@ -154,21 +199,23 @@ class Follow:
             # for the lag between here and whenever this thread actually gets to act on it
             c = self.size / 2
             dx, dy = (x + vx * self.lookahead) - c, (y + vy * self.lookahead) - c
-            if abs(dx) <= self.deadband and abs(dy) <= self.deadband:
+            if dx * dx + dy * dy <= self.deadband * self.deadband:  # squared distance of centre from centre, px^2
                 continue
             mm_per_px = self.object_size / size_px
             if abs(dx) > self.deadband:
                 step = self.pid_x.step(dx * mm_per_px)
-                west = (step > 0) != self.flip_x
-                self.stage.move_towards("west" if west else "east", abs(step))
-                self.offset[0] += -abs(step) if west else abs(step)
+                neg, pos = self.dirs[0]
+                towards = neg if (step > 0) != self.flip_x else pos
+                self.stage.move_towards(towards, abs(step))
+                self.offset[0] += -abs(step) if towards == neg else abs(step)
             if self._stop.is_set():
                 break
             if abs(dy) > self.deadband:
                 step = self.pid_z.step(dy * mm_per_px)
-                down = (step > 0) != self.flip_y
-                self.stage.move_towards("down" if down else "up", abs(step))
-                self.offset[1] += -abs(step) if down else abs(step)
+                neg, pos = self.dirs[1]
+                towards = neg if (step > 0) != self.flip_y else pos
+                self.stage.move_towards(towards, abs(step))
+                self.offset[1] += -abs(step) if towards == neg else abs(step)
             if np.abs(self.offset).max() > self.limit:
                 self._abort_reason = f"aborted: strayed past {self.limit} mm from {self.start}"
                 self._stop.set()
@@ -203,7 +250,9 @@ def main():
     p.add_argument("--light-port", help="EnderLights port; omit to run without an illuminator")
     p.add_argument("--light-baud", type=int, default=57600)
     p.add_argument("--home", action="store_true", help="home the stage on startup")
+    p.add_argument("--axes", default="xz", help="the two stage axes jog/follow drive, e.g. xz (default), xy, yz")
     p.add_argument("--x-step", type=float, default=5.0, help="mm per jog key in x")
+    p.add_argument("--y-step", type=float, default=5.0, help="mm per jog key in y")
     p.add_argument("--z-step", type=float, default=1.0, help="mm per jog key in z")
     p.add_argument("--object-size", type=float, default=0.05,
                     help="assumed real size (mm) of a tracked object, to scale pixel error to a stage move - set this "
@@ -214,7 +263,8 @@ def main():
     p.add_argument("--follow-ki", type=float, default=0.0, help="PID Ki: corrects a persistent residual offset; 0 disables")
     p.add_argument("--follow-kd", type=float, default=0.0, help="PID Kd: damps oscillation; 0 disables")
     p.add_argument("--follow-max-step", type=float, default=0.5, help="cap (mm) on a single follow correction")
-    p.add_argument("--follow-deadband", type=float, default=20.0, help="px from centre before follow corrects")
+    p.add_argument("--follow-deadband", type=float, default=20.0,
+                    help="radius (px) around centre within which follow does nothing")
     p.add_argument("--follow-interval", type=int, default=1,
                     help="tracking frames between publishing a fresh follow target (the mover thread paces itself "
                          "independently off the stage's own speed, not off this)")
@@ -225,6 +275,9 @@ def main():
     p.add_argument("--flip-x", action="store_true", help="invert the image-x to stage-east/west mapping for follow")
     p.add_argument("--flip-y", action="store_true", help="invert the image-y to stage-up/down (Z) mapping for follow")
     args = p.parse_args()
+    args.axes = parse_axes(args.axes)
+    jog_keys = jog_keys_for(args.axes)
+    key_axis = {k: axis for axis in args.axes for k in AXIS_JOG_KEYS[axis]}
     level = args.level
 
     device = "cpu" if args.cpu else None
@@ -243,7 +296,7 @@ def main():
     pos = stage.get_position() if stage else None
     follow = Follow(stage, args.size, args.object_size, args.follow_gain, args.follow_ki, args.follow_kd,
                      args.follow_max_step, args.follow_deadband, args.follow_interval, args.follow_limit,
-                     args.follow_lookahead, args.flip_x, args.flip_y) if stage else None
+                     args.follow_lookahead, args.flip_x, args.flip_y, args.axes) if stage else None
 
     cap = open_camera(args.cam)
     trails, fps = defaultdict(lambda: deque(maxlen=15)), 0.0
@@ -315,10 +368,11 @@ def main():
                     follow.start_on(next(t for t in result.tracks if t.id == selected_id))
                 else:
                     print("no tracks to follow")
-            elif follow and follow.active and chr(key) in (*JOG_KEYS, "h"):
+            elif follow and follow.active and chr(key) in (*jog_keys, "h"):
                 print("stop following (f) before jogging")
-            elif stage and chr(key) in JOG_KEYS:
-                stage.move_towards(JOG_KEYS[chr(key)], args.x_step if chr(key) in "ad" else args.z_step)
+            elif stage and chr(key) in jog_keys:
+                step = getattr(args, AXIS_STEP_ARG[key_axis[chr(key)]])
+                stage.move_towards(jog_keys[chr(key)], step)
                 pos = stage.get_position()
             elif stage and key == ord("h"):
                 stage.home()

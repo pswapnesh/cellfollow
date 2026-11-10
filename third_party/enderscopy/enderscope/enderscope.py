@@ -3,11 +3,6 @@ import sys
 from time import sleep
 
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
-
-from ipywidgets import widgets, Button, Layout, GridspecLayout, Output
-from IPython.display import display
 
 import serial
 
@@ -260,83 +255,6 @@ class Stage(SerialDevice):
         self.write_code(f'{G_CODES["device_params"]}', debug=debug)
 
 
-class Panel:
-    """
-    A control panel for the stage
-    This is a basic user interface to control the stage
-    built using ipywidgets
-    """
-    def __init__(self, stage):
-        self.recording = False
-        self.recorded_positions = [None] * 6
-        self.stage = stage
-        grid = GridspecLayout(5, 12, height='auto', width='auto')
-        grid[0:2, 0] = self.create_button('Up', 'paleturquoise')
-        grid[2:, 0] = self.create_button('Down', 'paleturquoise')
-        grid[0, 1:3] = self.create_button('North', 'palegreen')
-        grid[2, 1:3] = self.create_button('South', 'palegreen')
-        grid[1, 1] = self.create_button('West', 'palegreen')
-        grid[1, 2] = self.create_button('East', 'palegreen')
-        grid[3:, 1:3] = self.create_button('Home', 'lightyellow')
-        record_cb = widgets.Checkbox(value=False, description='Record', indent=False, layout=Layout(width='100px'))
-        record_cb.observe(self.checkbox_changed, names='value')
-        grid[0, 3:5] = record_cb
-        grid[1, 3] = self.create_button('P1', 'lightgrey')
-        grid[1, 4] = self.create_button('P2', 'lightgrey')
-        grid[2, 3] = self.create_button('P3', 'lightgrey')
-        grid[2, 4] = self.create_button('P4', 'lightgrey')
-        grid[3, 3] = self.create_button('P5', 'lightgrey')
-        grid[3, 4] = self.create_button('P6', 'lightgrey')
-        grid[4, 3] = self.create_button('Save', 'pink')
-        grid[4, 4] = self.create_button('Open', 'pink')
-        self.xys = 5
-        self.zs = 1
-        self.grid = grid
-        self.output = Output()
-        display (grid, self.output)
-
-    def create_button(self, description, btn_color):
-        btn = Button(description=description,
-                     style=dict(button_color=btn_color),
-                     layout=Layout(height='auto', width='auto'))
-        btn.on_click(self.on_button_clicked)
-        return btn
-
-    def set_steps(self, xys, zs):
-        self.xys = xys
-        self.zs = zs
-        
-    def checkbox_changed(self, element):
-        if element['new']:
-            self.recording = True
-            element['owner'].description = 'Recording...'
-        else:
-            self.recording = False
-            element['owner'].description = 'Record'
-        
-    def on_button_clicked(self, btn):
-        if btn.description == 'Home':
-            with self.output:
-                self.output.clear_output()
-                print('homing...')
-            self.stage.home()
-        elif btn.description.startswith('P'):
-            m = int(btn.description[-1]) - 1
-            if self.recording:
-                self.recorded_positions[m] = self.stage.get_position()
-                btn.style.button_color= '#ffd6b9'
-            elif self.recorded_positions[m] is not None:
-                self.stage.move_position(self.recorded_positions[m])
-        else:
-            self.stage.move_towards(btn.description, 5)
-        with self.output:
-            self.output.clear_output()
-            print('moving...')
-            self.stage.finish_moves()
-            self.output.clear_output()
-            print(self.stage.get_position(as_dict=True))
-            
-
 class EnderLights(SerialDevice):
     """
     An illumination device built from an Arduino board and a neopixels RGB leds ring
@@ -404,6 +322,8 @@ class ScanPatterns:
     The patterns are generated as numpy arrays
     """
     def plot_path(self, path=np.array([[0,0]]), labels=True, field=(10, 10), title='Path preview'):
+        import matplotlib.pyplot as plt
+        from matplotlib.patches import Rectangle
         x = path[:, 0]
         y = path[:, 1]
         field = Rectangle((0, 0), field[0], field[1])
@@ -461,18 +381,3 @@ class ScanPatterns:
             d = (d+1) % 4
             i += d%2 == 0
         return np.array(sp[:num_points])
-
-def gui():
-    """
-    A simple entry point to create a stage, lights and panel
-    """
-    ports = SerialDevice.serial_ports()
-    print(ports)
-    light_port = ports[1]
-    stage_port = ports[2]
-    stage = Stage(stage_port, 115200)
-    lights = EnderLights(light_port, baud_rate=57600)
-    stage.home()
-    panel = Panel(stage)
-    panel.set_steps(5, 1)
-    return stage, lights, panel

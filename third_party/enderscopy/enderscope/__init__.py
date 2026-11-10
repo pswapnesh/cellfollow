@@ -1,1 +1,1 @@
-from .enderscope import SerialDevice, Stage, Panel, EnderLights, ScanPatterns, gui
+from .enderscope import SerialDevice, Stage, EnderLights, ScanPatterns

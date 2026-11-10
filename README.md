@@ -67,8 +67,9 @@ python enderscope_live.py --no-stage                      # vision only, no hard
 ```
 
 Drives an [Enderscope](https://github.com/mutterer/enderscopy) (a 3D-printer-chassis microscope) while tracking,
-on the scope's own camera via OpenCV. Only X (east/west) and Z (up/down) are ever driven - this rig's camera
-moves with those two, not with Y (the bed's front-to-back travel) - so Y is never jogged and never used by follow.
+on the scope's own camera via OpenCV. Only two axes are ever driven, whichever `--axes` names (default `xz`) -
+set this to whichever pair your camera actually moves with (e.g. `--axes xy`); the third is never jogged and
+never used by follow.
 
 ### Keys (`enderscope_live.py`)
 
@@ -80,12 +81,13 @@ moves with those two, not with Y (the bed's front-to-back travel) - so Y is neve
 | `r` | Reset tracks |
 | `s` | Save frame |
 | `[` / `]` | Outline level down / up (lower = larger outline) |
-| `a` / `d` | Jog stage west / east (X) |
-| `e` / `c` | Jog stage up / down (Z) |
+| `a` / `d` | Jog stage west / east (X) - only if X is in `--axes` |
+| `w` / `x` | Jog stage north / south (Y) - only if Y is in `--axes` |
+| `e` / `c` | Jog stage up / down (Z) - only if Z is in `--axes` |
 | `h` | Home stage |
 | `l` | Toggle illuminator light |
 | `←`/`→` (or `↑`/`↓`) | Select a tracked cell (white ring) |
-| `f` | Follow the selected cell (yellow cross) until it's lost, strays past `--follow-limit`, or `f` again |
+| `f` | Toggle following the selected cell (yellow cross) |
 | `+` / `-` | Increase / decrease follow gain (speed of the follow correction) |
 
 Jogging and home are disabled while `f` is actively following - press `f` again to stop first.
@@ -94,23 +96,37 @@ Jogging and home are disabled while `f` is actively following - press `f` again 
 apparent size in pixels against `--object-size` (set this to the real size of your sample, e.g. ~0.002mm for a
 2 micron bacterium, or the moves will be the wrong scale), scaled by `--follow-gain` (lower it if follow
 drifts/overshoots instead of settling - `+`/`-` adjust this live), capped at `--follow-max-step` mm per
-correction, and stopped if the track is lost or the stage strays past `--follow-limit` mm from where it started.
-The camera/tracking loop and the stage move independently on separate threads - the stage's serial round-trips
-are the slow part, and publishing a fresh target just replaces a stale one the mover hasn't gotten to yet, so
-the camera/display frame rate is never held hostage by how fast the hardware responds.
+correction. "Close enough to stop correcting" (`--follow-deadband`) is a circular region - the squared distance
+of the cell from frame centre, not two independent per-axis checks - so a cell sitting diagonally off-centre
+isn't wrongly treated as centred just because each axis individually looks small. Losing the followed cell
+switches to whichever other track is nearest the frame centre instead of stopping, so an ordinary track swap
+doesn't quietly turn follow off; it only stops on `f` again, if no tracks remain at all, or if the stage has
+moved more than `--follow-limit` mm from where following began. The camera/tracking loop and the stage move
+independently on separate threads - the stage's serial round-trips are the slow part, and publishing a fresh
+target just replaces a stale one the mover hasn't gotten to yet, so the camera/display frame rate is never held
+hostage by how fast the hardware responds.
+
+The pixel-to-stage mapping assumes the camera's x/y axes are parallel to the two chosen stage axes (give or
+take a flip via `--flip-x`/`--flip-y`) - it does not account for the camera being mounted at a rotation. A cell
+that drifts further from centre instead of settling, in a way flipping doesn't fix, usually means that.
 
 `--cpu` forces the model onto CPU (no GPU/CUDA needed at all), in case this runs on a machine without a GPU.
 
-`third_party/enderscopy` is an
-unmodified copy of its `enderscope` package (pinned to commit `ea935a7`, with its original `LICENSE`), not
-`pip install`ed: its `pyproject.toml` has a placeholder author email that current `setuptools` rejects outright,
-so `pip install` (even `--no-deps`) fails before it gets anywhere near resolving dependencies like `picamera2`.
-A plain file copy sidesteps that entirely - `enderscope_live.py`/`enderscope_test.py` just add it to `sys.path`
-and `import enderscope` normally. Requires the user to be in the `dialout` group
-(`sudo usermod -aG dialout $USER`, then re-login) to open the serial port at all.
+`third_party/enderscopy` is a vendored copy of its `enderscope` package (pinned to commit `ea935a7`, with its
+original `LICENSE`), not `pip install`ed: its `pyproject.toml` has a placeholder author email that current
+`setuptools` rejects outright, so `pip install` (even `--no-deps`) fails before it gets anywhere near resolving
+dependencies like `picamera2`. A plain file copy sidesteps that entirely - `enderscope_live.py`/`enderscope_test.py`
+just add it to `sys.path` and `import enderscope` normally. It's trimmed from the original, not a byte-for-byte
+copy: `Panel` and `gui()` (notebook UI, built on `ipywidgets`/`IPython.display`) are removed since nothing here
+uses them, and `ScanPatterns.plot_path`'s `matplotlib` import is now lazy (inside the method) rather than at
+module level - so importing `enderscope` needs only `pyserial` and `numpy`, not the three packages that one
+notebook class needed. `Stage`/`EnderLights`/`ScanPatterns`'s own G-code/pattern-generation logic is untouched.
+Requires the user to be in the `dialout` group (`sudo usermod -aG dialout $USER`, then re-login) to open the
+serial port at all.
 
-To refresh the vendored copy from a newer commit, re-download `enderscope/enderscope.py`, `enderscope/__init__.py`
-and `LICENSE` from the repo at the desired ref into `third_party/enderscopy/`.
+To refresh the vendored copy from a newer commit: re-download `enderscope/enderscope.py` and `LICENSE` from the
+repo at the desired ref, then reapply the same trim (remove `Panel`/`gui()`, lazy-import `matplotlib` in
+`plot_path`, and update `enderscope/__init__.py`'s exports to match).
 
 `enderscope_test.py` is a small bounded motion smoke test for first contact with a stage: it nudges one axis at a
 time by `--step` mm and back, checking the reported position against `--limit` mm from the start after every move,
