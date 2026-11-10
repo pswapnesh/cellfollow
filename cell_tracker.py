@@ -4,7 +4,7 @@
     result = tracker.update(frame)                              # frame: (H, W) grayscale or (H, W, 3) BGR
     result.tracks                                               # [Track(id, y, x, vy, vx, p_exist, cls, cls_prob, points, shape)]
     result.labels                                               # (H, W) int64, a mask holds its track's id; None if
-                                                                # masks=None (gmm.outline gives a track's outline)
+                                                                # masks=None (tracking.gmm.outline gives a track's outline)
 """
 
 from dataclasses import dataclass
@@ -13,10 +13,10 @@ import cv2
 import numpy as np
 import torch
 
-from bayes_tracker import BayesTracker
-from cell_probability import calibrated_score, fg_probability
-from masks import flow_masks, fg_masks, with_track_ids
 from model import CellNet
+from tracking.bayes_tracker import BayesTracker
+from tracking.cell_probability import calibrated_score, fg_probability
+from tracking.masks import flow_masks, fg_masks, with_track_ids
 
 
 def normalize(channel, lo_pct=1.0, hi_pct=99.0):

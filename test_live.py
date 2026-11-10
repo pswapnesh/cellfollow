@@ -17,7 +17,7 @@ import numpy as np
 import torch
 
 from cell_tracker import CellTracker
-from gmm import outline
+from tracking.gmm import outline
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MODES = (None, "fg", "flow")

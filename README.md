@@ -17,7 +17,7 @@ pip install -r requirements.txt
 
 ```python
 from cell_tracker import CellTracker
-from gmm import outline
+from tracking.gmm import outline
 
 tracker = CellTracker("weights/cellpoint.pt")   # points only; masks="fg" or "flow" adds the dense head
 result = tracker.update(frame)                  # (H, W) grayscale or (H, W, 3) BGR
@@ -132,13 +132,16 @@ Saves an mp4 with outlines or masks and tracks drawn as in the live view. `--con
 | File | Contents |
 |---|---|
 | `cell_tracker.py` | `CellTracker`: frame in, tracks and masks out |
-| `bayes_tracker.py` | The Bayesian tracker |
-| `cell_probability.py` | How likely a detection is to be a real cell |
-| `gmm.py` | A cell's Gaussians and their outline |
-| `masks.py` | Masks from the foreground map and flow |
+| `tracking/bayes_tracker.py` | The Bayesian tracker |
+| `tracking/cell_probability.py` | How likely a detection is to be a real cell |
+| `tracking/gmm.py` | A cell's Gaussians and their outline |
+| `tracking/masks.py` | Masks from the foreground map and flow |
 | `model.py` | The network |
+| `utils/kalman.py` | A reusable constant-velocity Kalman filter |
+| `utils/pid.py` | A reusable PID controller |
 | `test_live.py` | Webcam view |
 | `enderscope_live.py` | Webcam view driven by an Enderscope stage/illuminator |
 | `enderscope_test.py` | Small bounded stage-motion smoke test |
 | `third_party/enderscopy/` | Vendored copy of the `enderscope` package (`Stage`, `EnderLights`, ...) |
+| `third_party/ultralytics_cfg/` | Vendored copy of `yolo26.yaml` (AGPL-3.0, see its `LICENSE`) |
 | `test_on_video.py` | Process a video or TIFF stack, save the result |

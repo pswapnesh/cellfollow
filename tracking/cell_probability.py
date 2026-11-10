@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from gmm import point_covariances
+from .gmm import point_covariances
 
 
 def logit_score(score):
