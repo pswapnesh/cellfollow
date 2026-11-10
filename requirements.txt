@@ -1,0 +1,6 @@
+numpy
+opencv-python
+scipy
+tifffile
+torch
+ultralytics==8.4.46
