@@ -70,6 +70,7 @@ class BayesTracker:
         d, k = self.d, self.k
         self.next_id = 1
         self.ids, self.p, self.lost = np.zeros(0, np.int64), np.zeros(0), np.zeros(0, np.int64)
+        self.det_ids = np.zeros(0, np.int64)
         self.X, self.P = np.zeros((0, 2 * d)), np.zeros((0, 2 * d, 2 * d))
         self.S, self.V, self.cls = np.zeros((0, k + 1, 2, 2)), np.zeros((0, k + 1)), np.zeros((0, self.nc))
 
@@ -147,6 +148,7 @@ class BayesTracker:
         self.P = self.F @ self.P @ self.F.T + self.Q
         self.V = self.V + self.q_shape
         free, hit = np.ones(len(mu), bool), np.zeros(len(self.ids), bool)
+        det_ids = np.zeros(len(mu), np.int64)
         if len(self.ids) and len(mu):
             L = self.log_odds(mu, shape, prob)
             r, c = linear_sum_assignment(-np.maximum(L, 0))       # a pair with LLR <= 0 gains nothing over no match
@@ -154,6 +156,7 @@ class BayesTracker:
             if ok.any():
                 self.correct(r[ok], c[ok], mu, R, shape, prob, cls_prob)
                 hit[r[ok]], free[c[ok]] = True, False
+                det_ids[c[ok]] = self.ids[r[ok]]
         miss = ~hit
         self.p[miss] = self.p[miss] * (1 - self.p_d) / (self.p[miss] * (1 - self.p_d) + 1 - self.p[miss])
         self.lost = np.where(hit, 0, self.lost + 1)
@@ -164,6 +167,8 @@ class BayesTracker:
         X[:, :d] = mu[new]
         P[:, :d, :d] = R[new]
         P[:, range(d, 2 * d), range(d, 2 * d)] = self.v0
+        det_ids[new] = np.arange(self.next_id, self.next_id + n)
+        self.det_ids = det_ids                                    # track id of each detection, 0 if none
         self.ids = np.concatenate([self.ids[keep], np.arange(self.next_id, self.next_id + n)])
         self.next_id += n
         self.X, self.P = np.concatenate([self.X[keep], X]), np.concatenate([self.P[keep], P])

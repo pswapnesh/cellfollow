@@ -1,0 +1,6 @@
+# export_fast.py / fast_live.py, on top of requirements.txt
+onnx
+onnxscript
+onnxruntime     # CPU, portable (also ARM)
+openvino        # CPU, fastest on Intel
+tensorrt-cu12   # GPU (NVIDIA, CUDA 12); TensorRT 10+ builds the engine from the fp16 graph

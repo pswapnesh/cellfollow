@@ -7,6 +7,8 @@ every cell a Gaussian shape with an outline, without a segmentation decoder. A B
 detection is matched by the symmetric KL divergence between shapes, and existence is a probability updated on every
 frame. An optional dense head adds a foreground map, which gives masks and a better estimate of which detections are real.
 
+![cellpoint network](docs/model.svg)
+
 ## Install
 
 ```
@@ -54,8 +56,67 @@ python test_live.py
 python test_live.py --cam 0 --masks fg --cpu
 ```
 
-Uses a USB camera if one is present, otherwise the integrated one. Keys: `q` quit, `m` masks (off / fg / flow),
+Uses a USB camera if one is present, otherwise the integrated one. Dropped frames and stalls of up to 5 s are retried (a USB camera is reopened
+if needed); the view only stops if the camera stays gone. Keys: `q` quit, `m` masks (off / fg / flow),
 `i` invert, `r` reset tracks, `s` save frame.
+
+## Fast live (exported models)
+
+```
+pip install -r requirements-fast.txt
+python export_fast.py                       # once per machine: GPU engine + CPU model, 640 x 640
+python fast_live.py                         # TensorRT on the GPU if there is one, else OpenVINO
+python fast_live.py --cpu --pipeline        # CPU; network overlapped with post-processing
+python fast_live.py --masks flow            # hybrid flow + GMM masks
+python fast_live.py --masks none            # points only: no dense head, the fastest
+```
+
+`export_fast.py` exports two networks at a fixed size, with normalising, the sigmoids and the 3 x 3 peak search
+inside the graph (input: the raw uint8 frame): the full network (points + dense head) for masks, and the points-only
+network (the dense decoder cut off, the backbone stopped at P3), where tracking only knows the detections. Each in
+three formats (`_points` in the name for the points-only one):
+
+| Output | For | Notes |
+|---|---|---|
+| `weights/cellpoint_640[_points]_fp16.engine` | GPU | TensorRT, fp16. Only runs on the GPU and TensorRT version that built it (3-6 minutes) |
+| `weights/cellpoint_640[_points]_openvino/` | CPU | OpenVINO, fp32. Fastest on Intel CPUs |
+| `weights/cellpoint_640[_points].onnx` | CPU | onnxruntime, fp32. Portable (also ARM) |
+
+Post-processing is NumPy and the same for every backend (`tracking/fast_post.py`). It gives the same detections,
+P(real) and fg masks as `CellTracker(masks="fg")` (`check_fast.py` compares them), with the slow parts rewritten:
+percentiles from the uint8 histogram, the flow covariance blur evaluated only at the points that read it, and
+`fill_cuts` searching a 5 x 5 window instead of running a distance transform over the frame.
+
+Modes (`m` cycles fg / flow / none live; the other network loads the first time it is needed):
+
+- `fg`: connected regions of the foreground map. Each mask takes the track whose centre lies inside it.
+- `flow`: hybrid. The flow is Gaussian-smoothed, then fg pixels follow it, cellpose style, to their cell's medial
+  axis. Each endpoint joins the detection whose Gaussians (centre and eigen points, with their learnt shapes)
+  explain it best, weighted by the detection's P(real). A mask therefore belongs to a detection, and so to the
+  track the tracker matched that detection to. fg that no detection claims becomes untracked masks.
+- `none`: points only. P(real) is the calibrated point score and outlines come from each track's Gaussians, as
+  `CellTracker(masks=None)`.
+
+Only the masks of reported tracks are shown (`u` or `--show-untracked` shows the rest).
+
+640 x 640, about 47 cells, per frame on an i7-11850H + RTX A4000 Laptop, without drawing:
+
+| | fg | flow | none (points only) |
+|---|---|---|---|
+| TensorRT fp16 | 14-16 ms (net 4, post 9, track 3-4) | 20 ms | 4.2 ms (net 1.8) |
+| OpenVINO CPU | 40-43 ms (net 29, post 10, track 4) | 45-49 ms | 13 ms (net 9.5) |
+| onnxruntime CPU | 54-75 ms | 75 ms | 16 ms |
+| `CellTracker`, CPU | 90-140 ms | | 25 ms |
+
+The CPU exports give the same detections and tracks as `CellTracker`. With fp16 (TensorRT) a few detections near
+the thresholds differ, as with `CellTracker` on the GPU; an extra track born early shifts the ids of later ones.
+
+On the GPU, post-processing on the CPU is now most of the time, so a laptop on a power-saving profile runs up to
+twice slower than this (the clock falls to about 1.1 GHz). Plug it in or set a performance power profile.
+
+`--pipeline` runs the network on the next frame while the current one is post-processed: faster when the network is
+the slow part (CPU), but results are shown one frame late. Keys as `test_live.py`, plus `m` fg / flow masks,
+`c` masks / outlines, `u` untracked masks. The HUD shows `gpu` or `cpu`, and the net / post / track times.
 
 ## Enderscope
 
@@ -157,6 +218,11 @@ Saves an mp4 with outlines or masks and tracks drawn as in the live view. `--con
 | `utils/pid.py` | A reusable PID controller |
 | `camera.py` | `Camera`: a USB camera if present, else the Pi's CSI camera via picamera2 |
 | `test_live.py` | Webcam view |
+| `export_fast.py` | Export the full and points-only networks: TensorRT engine (GPU), OpenVINO and ONNX (CPU) |
+| `fast_tracker.py` | `FastCellTracker`: an exported network, NumPy post-processing, masks + tracking |
+| `tracking/fast_post.py` | NumPy decoding, fg masks, P(real) and the hybrid flow + GMM masks |
+| `fast_live.py` | Webcam view on `FastCellTracker` |
+| `check_fast.py` | Compare an export against `CellTracker` and time both |
 | `enderscope_live.py` | Webcam view driven by an Enderscope stage/illuminator |
 | `enderscope_test.py` | Small bounded stage-motion smoke test |
 | `third_party/enderscopy/` | Vendored copy of the `enderscope` package (`Stage`, `EnderLights`, ...) |

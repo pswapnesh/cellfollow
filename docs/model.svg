@@ -1,0 +1,644 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 800 320"
+   width="800"
+   height="320"
+   font-family="Inter, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif"
+   version="1.1"
+   id="svg46"
+   sodipodi:docname="model.svg"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview46"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="0.99490865"
+     inkscape:cx="287.96614"
+     inkscape:cy="247.76144"
+     inkscape:window-width="1920"
+     inkscape:window-height="978"
+     inkscape:window-x="0"
+     inkscape:window-y="27"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg46" />
+  <title
+     id="title1">cellpoint network</title>
+  <style
+     id="style1">
+    .ink   { stroke: #24292f; fill: none; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+    .dense { stroke: #d97706; fill: none; stroke-width: 1; stroke-dasharray: 3 2.5; stroke-linecap: round; }
+    .node  { stroke: #d97706; fill: none; stroke-width: 1; }
+    .tint  { fill: #0f9d8a; fill-opacity: 0.12; }
+    .cell  { fill: #d97706; fill-opacity: 0.28; stroke: none; }
+    .t     { fill: #24292f; font-size: 9.5px; }
+    .h     { fill: #24292f; font-size: 12px; font-weight: 600; letter-spacing: 0.2px; }
+    .m     { fill: #6e7781; font-size: 8.5px; }
+    .w     { fill: #d97706; font-size: 8.5px; }
+    .arrow { fill: #24292f; }
+    .arroww{ fill: #d97706; }
+    @media (prefers-color-scheme: dark) {
+      .ink { stroke: #e6edf3; } .t, .h { fill: #e6edf3; } .m { fill: #8b949e; } .arrow { fill: #e6edf3; }
+      .dense, .w, .node { stroke: #f0a04b; } .w { fill: #f0a04b; stroke: none; } .cell { fill: #f0a04b; } .arroww { fill: #f0a04b; }
+    }
+  </style>
+  <defs
+     id="defs6">
+    <marker
+       id="a"
+       viewBox="0 0 6 6"
+       refX="5.5"
+       refY="3"
+       markerWidth="6"
+       markerHeight="6"
+       orient="auto">
+      <path
+         d="M0.5,0.8 L5.5,3 L0.5,5.2"
+         class="ink"
+         id="path1" />
+    </marker>
+    <marker
+       id="aw"
+       viewBox="0 0 6 6"
+       refX="5.5"
+       refY="3"
+       markerWidth="6"
+       markerHeight="6"
+       orient="auto">
+      <path
+         d="M0.5,0.8 L5.5,3 L0.5,5.2"
+         stroke="#d97706"
+         fill="none"
+         stroke-width="1"
+         stroke-linecap="round"
+         id="path2" />
+    </marker>
+    <g
+       id="rods">
+      <ellipse
+         cx="14"
+         cy="16"
+         rx="9"
+         ry="3"
+         transform="rotate(-30 14 16)"
+         id="ellipse2" />
+      <ellipse
+         cx="38"
+         cy="14"
+         rx="7"
+         ry="2.8"
+         transform="rotate(20 38 14)"
+         id="ellipse3" />
+      <ellipse
+         cx="24"
+         cy="33"
+         rx="10"
+         ry="3"
+         transform="rotate(65 24 33)"
+         id="ellipse4" />
+      <ellipse
+         cx="42"
+         cy="40"
+         rx="6"
+         ry="2.8"
+         transform="rotate(-50 42 40)"
+         id="ellipse5" />
+      <ellipse
+         cx="12"
+         cy="44"
+         rx="5"
+         ry="2.6"
+         transform="rotate(10 12 44)"
+         id="ellipse6" />
+    </g>
+  </defs>
+  <!-- title -->
+  <text
+     x="16"
+     y="24"
+     class="h"
+     id="text6">CellFollow</text>
+  <text
+     x="84"
+     y="24"
+     class="m"
+     id="text7">2.4 M parameters · points-only 1.6 M · 640 × 640</text>
+  <!-- input frame -->
+  <text
+     x="38"
+     y="96"
+     class="t"
+     text-anchor="middle"
+     id="text8">frame</text>
+  <rect
+     x="10"
+     y="102"
+     width="56"
+     height="56"
+     rx="3"
+     class="ink"
+     id="rect8" />
+  <use
+     href="#rods"
+     x="12"
+     y="104"
+     class="ink"
+     stroke-width="0.8"
+     id="use8" />
+  <text
+     x="38"
+     y="171"
+     class="m"
+     text-anchor="middle"
+     id="text9">uint8 · 640²</text>
+  <!-- normalise + 1x1 adapter -->
+  <line
+     x1="66"
+     y1="130"
+     x2="77"
+     y2="130"
+     class="ink"
+     marker-end="url(#a)"
+     id="line9" />
+  <rect
+     x="78"
+     y="121"
+     width="56"
+     height="18"
+     rx="9"
+     class="ink"
+     id="rect9" />
+  <text
+     x="106"
+     y="133"
+     class="m"
+     text-anchor="middle"
+     id="text10">norm · 1×1</text>
+  <line
+     x1="134"
+     y1="130"
+     x2="145"
+     y2="130"
+     class="ink"
+     marker-end="url(#a)"
+     id="line10" />
+  <!-- encoder pyramid: YOLO26n backbone + neck -->
+  <text
+     x="146"
+     y="80"
+     class="m"
+     id="text11">YOLO26n · backbone + neck</text>
+  <rect
+     x="146"
+     y="104"
+     width="52"
+     height="52"
+     rx="2"
+     class="ink"
+     id="rect11" />
+  <text
+     x="172"
+     y="133"
+     class="t"
+     text-anchor="middle"
+     id="text12">P1</text>
+  <text
+     x="172"
+     y="97"
+     class="m"
+     text-anchor="middle"
+     id="text13">16 · 320²</text>
+  <line
+     x1="198"
+     y1="130"
+     x2="222"
+     y2="130"
+     class="ink"
+     marker-end="url(#a)"
+     id="line13" />
+  <rect
+     x="223"
+     y="109"
+     width="42"
+     height="42"
+     rx="2"
+     class="ink"
+     id="rect13" />
+  <text
+     x="244"
+     y="133"
+     class="t"
+     text-anchor="middle"
+     id="text14">P2</text>
+  <text
+     x="244"
+     y="102"
+     class="m"
+     text-anchor="middle"
+     id="text15">64 · 160²</text>
+  <line
+     x1="265"
+     y1="130"
+     x2="290"
+     y2="130"
+     class="ink"
+     marker-end="url(#a)"
+     id="line15" />
+  <rect
+     x="291"
+     y="113"
+     width="34"
+     height="34"
+     rx="2"
+     class="tint"
+     id="rect15" />
+  <rect
+     x="291"
+     y="113"
+     width="34"
+     height="34"
+     rx="2"
+     class="ink"
+     id="rect16" />
+  <text
+     x="308"
+     y="133"
+     class="t"
+     text-anchor="middle"
+     id="text16">P3</text>
+  <text
+     x="304"
+     y="106"
+     class="m"
+     text-anchor="end"
+     id="text17">64 · 80²</text>
+  <line
+     x1="325"
+     y1="130"
+     x2="350"
+     y2="130"
+     class="dense"
+     marker-end="url(#aw)"
+     id="line17" />
+  <rect
+     x="351"
+     y="117"
+     width="26"
+     height="26"
+     rx="2"
+     class="dense"
+     id="rect17" />
+  <text
+     x="364"
+     y="133"
+     class="t"
+     text-anchor="middle"
+     id="text18">P4</text>
+  <text
+     x="364"
+     y="110"
+     class="w"
+     text-anchor="middle"
+     id="text19">128 · 40²</text>
+  <line
+     x1="377"
+     y1="130"
+     x2="399"
+     y2="130"
+     class="dense"
+     marker-end="url(#aw)"
+     id="line19" />
+  <rect
+     x="400"
+     y="120"
+     width="20"
+     height="20"
+     rx="2"
+     class="dense"
+     id="rect19" />
+  <text
+     x="410"
+     y="133"
+     class="t"
+     text-anchor="middle"
+     font-size="8.5"
+     id="text20">P5</text>
+  <text
+     x="410"
+     y="113"
+     class="w"
+     text-anchor="middle"
+     id="text21">256 · 20²</text>
+  <!-- heads on P3 -->
+  <path
+     d="M318,113 V56 H449"
+     class="ink"
+     marker-end="url(#a)"
+     id="path21" />
+  <text
+     x="450"
+     y="32"
+     class="m"
+     id="text22">heads · P3</text>
+  <rect
+     x="450"
+     y="38"
+     width="142"
+     height="36"
+     rx="6"
+     class="ink"
+     id="rect22" />
+  <text
+     x="460"
+     y="53"
+     class="t"
+     id="text23">points <tspan
+   class="m"
+   id="tspan22">cls 4 · offset 2 · pts 8</tspan></text>
+  <text
+     x="460"
+     y="67"
+     class="t"
+     id="text24">cov <tspan
+   class="m"
+   id="tspan23">shape 15 · error 55</tspan></text>
+  <line
+     x1="592"
+     y1="56"
+     x2="611"
+     y2="56"
+     class="ink"
+     marker-end="url(#a)"
+     id="line24" />
+  <rect
+     x="612"
+     y="47"
+     width="58"
+     height="18"
+     rx="9"
+     class="ink"
+     id="rect24" />
+  <text
+     x="641"
+     y="59"
+     class="m"
+     text-anchor="middle"
+     id="text25">3×3 peaks</text>
+  <path
+     d="M670,56 H740 V111"
+     class="ink"
+     marker-end="url(#a)"
+     id="path25" />
+  <text
+     x="680"
+     y="50"
+     class="m"
+     id="text26">detections</text>
+  <!-- tracker -->
+  <rect
+     x="700"
+     y="112"
+     width="80"
+     height="38"
+     rx="6"
+     class="ink"
+     id="rect26" />
+  <text
+     x="740"
+     y="128"
+     class="t"
+     text-anchor="middle"
+     id="text27">Bayes tracker</text>
+  <text
+     x="740"
+     y="141"
+     class="m"
+     text-anchor="middle"
+     id="text28">KL · p(exist)</text>
+  <!-- dense decoder: up from P5 with skips -->
+  <path
+     d="M410,140 V232 H368"
+     class="dense"
+     marker-end="url(#aw)"
+     id="path28" />
+  <line
+     x1="364"
+     y1="143"
+     x2="364"
+     y2="228"
+     class="dense"
+     id="line28" />
+  <line
+     x1="308"
+     y1="147"
+     x2="308"
+     y2="228"
+     class="dense"
+     id="line29" />
+  <line
+     x1="244"
+     y1="151"
+     x2="244"
+     y2="228"
+     class="dense"
+     id="line30" />
+  <line
+     x1="172"
+     y1="156"
+     x2="172"
+     y2="228"
+     class="dense"
+     id="line31" />
+  <circle
+     cx="364"
+     cy="232"
+     r="3.5"
+     class="node"
+     id="circle31" />
+  <circle
+     cx="308"
+     cy="232"
+     r="3.5"
+     class="node"
+     id="circle32" />
+  <circle
+     cx="244"
+     cy="232"
+     r="3.5"
+     class="node"
+     id="circle33" />
+  <circle
+     cx="172"
+     cy="232"
+     r="3.5"
+     class="node"
+     id="circle34" />
+  <line
+     x1="360.5"
+     y1="232"
+     x2="312"
+     y2="232"
+     class="dense"
+     marker-end="url(#aw)"
+     id="line34" />
+  <line
+     x1="304.5"
+     y1="232"
+     x2="248"
+     y2="232"
+     class="dense"
+     marker-end="url(#aw)"
+     id="line35" />
+  <line
+     x1="240.5"
+     y1="232"
+     x2="176"
+     y2="232"
+     class="dense"
+     marker-end="url(#aw)"
+     id="line36" />
+  <text
+     x="364"
+     y="250"
+     class="w"
+     text-anchor="middle"
+     id="text36">96</text>
+  <text
+     x="308"
+     y="250"
+     class="w"
+     text-anchor="middle"
+     id="text37">64</text>
+  <text
+     x="244"
+     y="250"
+     class="w"
+     text-anchor="middle"
+     id="text38">48</text>
+  <text
+     x="172"
+     y="250"
+     class="w"
+     text-anchor="middle"
+     id="text39">32</text>
+  <text
+     x="268"
+     y="268"
+     class="m"
+     text-anchor="middle"
+     id="text40">dense decoder</text>
+  <line
+     x1="168.5"
+     y1="232"
+     x2="135"
+     y2="232"
+     class="dense"
+     marker-end="url(#aw)"
+     id="line40" />
+  <rect
+     x="78"
+     y="223"
+     width="56"
+     height="18"
+     rx="9"
+     class="dense"
+     id="rect40" />
+  <text
+     x="106"
+     y="235"
+     class="w"
+     text-anchor="middle"
+     id="text41">×2 shuffle</text>
+  <line
+     x1="78"
+     y1="232"
+     x2="67"
+     y2="232"
+     class="dense"
+     marker-end="url(#aw)"
+     id="line41" />
+  <!-- dense output -->
+  <text
+     x="38"
+     y="198"
+     class="t"
+     text-anchor="middle"
+     id="text42">fg · flow</text>
+  <rect
+     x="10"
+     y="204"
+     width="56"
+     height="56"
+     rx="3"
+     class="dense"
+     id="rect42" />
+  <use
+     href="#rods"
+     x="12"
+     y="206"
+     class="cell"
+     id="use42" />
+  <!-- masks into the tracker -->
+  <path
+     d="M38,260 V292 H199"
+     class="dense"
+     marker-end="url(#aw)"
+     id="path42" />
+  <rect
+     x="200"
+     y="283"
+     width="150"
+     height="18"
+     rx="9"
+     class="dense"
+     id="rect43" />
+  <text
+     x="275"
+     y="295"
+     class="w"
+     text-anchor="middle"
+     id="text43">masks · fg | flow + GMM</text>
+  <path
+     d="M350,292 H740 V151"
+     class="dense"
+     marker-end="url(#aw)"
+     id="path43" />
+  <!-- legend -->
+  <line
+     x1="470"
+     y1="196"
+     x2="494"
+     y2="196"
+     class="ink"
+     id="line43" />
+  <text
+     x="502"
+     y="199"
+     class="m"
+     id="text44">points-only network → tracks</text>
+  <line
+     x1="470"
+     y1="214"
+     x2="494"
+     y2="214"
+     class="dense"
+     id="line44" />
+  <text
+     x="502"
+     y="217"
+     class="m"
+     id="text45">full network adds the dense head → masks</text>
+  <text
+     x="470"
+     y="240"
+     class="m"
+     id="text46">TensorRT fp16 · 1.8 ms points-only · 4 ms full</text>
+</svg>

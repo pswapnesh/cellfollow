@@ -1,3 +1,7 @@
 __pycache__/
 *.pyc
 capture_*.png
+# exports of export_fast.py: rebuilt per machine (a TensorRT engine only runs on the GPU/TensorRT that built it)
+weights/cellpoint_*.engine
+weights/cellpoint_*.onnx
+weights/cellpoint_*_openvino/
